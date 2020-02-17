@@ -1,0 +1,119 @@
+---
+title: "assignment4"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Installations from CRAN
+c("flexdashboard",   
+  "plotly",         
+  "tidyverse",      
+  "rvest",
+  "ballr",
+  "purrr",
+  "tseries"        
+ 
+  ) -> package_names  
+
+for(package_name in package_names) {
+  if(!is.element(package_name, installed.packages()[,1])) {
+     install.packages(package_name,
+                      repos = "http://cran.mtu.edu/")
+  }
+  library(package_name, character.only=TRUE,
+          quietly=TRUE,verbose=FALSE)
+}
+
+# Installations from devtools. Because of folder structure on GitHub,
+#  these must be done individually
+if(!is.element("tsdl", installed.packages()[,1])) {
+  devtools::install_github("FinYang/tsdl")  # Everything else is on CRAN
+}
+library(tsdl)
+
+rm(list=c("package_name", "package_names"))
+
+options(show.signif.stars = FALSE)
+
+```
+I pulled data from basketball references with the ballR package. I used data from the current NBA season and filtered the data to get the top 50 scorers in the NBA.
+```{r data prep}
+# reading in data
+pergamestats_df <- NBAPerGameStatistics(season = 2020)
+advgamestats_df <- NBAPerGameAdvStatistics(season = 2020)
+
+# merging per game and adv stats
+merge(pergamestats_df, advgamestats_df, by = "link") -> sznstats_df
+
+# filter for at least 40 games in 2020 season, top 65 pts (to account for duplicates)
+
+sznstats_df%>%
+  filter(., gs > 40) %>%
+ top_n(n = 65, pts) %>% 
+distinct() -> top50scorers_df
+
+# removing duplicates
+top50scorers_df[-c(12,13,14,15,16,39,40,41,42,43,60,61,62,63,64),] -> top50scorers_df
+
+# remove extra columns, remaning columns
+top50scorers_df%>%
+  select(., -rk.x, -g.x, -rk.y, -player.y, -pos.y, -age.y, -tm.y, -g.y, -mp.y, -link) %>%
+  rename(player = player.x, pos = pos.x, age = age.x, team = tm.x, mp = mp.x) %>%
+  select(., -x, -x_2) -> top50scorers_df
+```
+ 
+```{r graphs}
+# Top Scorers / Win Shares
+scoringplot1 <- plot_ly(top50scorers_df, x = ~pts, y = ~ws,
+  # Hover text:
+  text = ~paste("Player:",player,"<br>Points Per Game:", pts, "<br>Win Shares:", ws),
+  color = ~usgpercent, size = ~bpm) %>%
+  # Titles
+  layout(title = 'Are the Top Scores in the NBA Effecting Winning',
+         yaxis = list(zeroline = TRUE),
+         xaxis = list(zeroline = TRUE))
+  
+scoringplot1
+
+# The top scorers are influencing wining so now my question was what about there scoring is influencing winning
+
+top50scorers_df %>%
+  filter(., ws >= 5) -> topwinscorers_df
+
+scoringplot2 <- plot_ly(topwinscorers_df, x = ~ftr, y = ~ws,
+  # Hover text:
+  text = ~paste("Player:",player,"<br>Win Shares:", ws, "<br>Points Per Game:", pts),
+  color = ~usgpercent, size = ~age) %>%
+  
+  layout(title = 'How are the Best winning players Scoring in the NBA (Free Throws)',
+         xaxis = list(title = 'Free Throw Rate'),
+         yaxis = list(title = 'Win Shares'))
+
+scoringplot2
+
+# Free Throw Rate seems to be a good indicator of how a scorer influences winning
+
+scoringplot3 <- plot_ly(topwinscorers_df, x = ~x3par, y = ~ws,
+  # Hover text:
+  text = ~paste("Player:",player,"<br>Win Shares:", ws, "<br>Points Per Game:", pts),
+  color = ~usgpercent, size = ~age) %>%
+  
+  layout(title = 'How are the Best winning players Scoring in the NBA (3 Pointers)',
+         xaxis = list(title = '3 Point Rate'),
+         yaxis = list(title = 'Win Shares'))
+
+scoringplot3
+
+
+
+```
+
+```{r}
+
+```
+
+
